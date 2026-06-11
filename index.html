@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerador de Boletins — Colégio Caminhos e Colinas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+/* ── Reset ───────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --navy:    #1a3557;
+  --navy-dk: #0e2338;
+  --blue:    #185FA5;
+  --green:   #1a6e35;
+  --amber:   #a05800;
+  --red:     #a02020;
+  --bg:      #eef2f8;
+  --surface: #ffffff;
+  --border:  #cdd6e6;
+  --text:    #1e2a3a;
+  --text2:   #5a6a7e;
+  --r:       8px;
+  --shadow:  0 2px 12px rgba(20,34,58,.09);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 2rem 1rem 5rem;
+}
+
+.app { max-width: 860px; margin: 0 auto; }
+
+/* ── Page header ─────────────────────────────────────────────────────── */
+.ph { display: flex; align-items: center; gap: 14px; margin-bottom: 1.5rem; }
+.ph-icon {
+  width: 44px; height: 44px; background: var(--navy); border-radius: var(--r);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.ph h1 { font-size: 19px; font-weight: 700; color: var(--navy); }
+.ph p  { font-size: 12px; color: var(--text2); margin-top: 1px; }
+
+/* ── Card ────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem; box-shadow: var(--shadow);
+}
+.card-title {
+  font-size: 11px; font-weight: 700; color: var(--text2);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: .9rem;
+}
+
+/* ── Config grid ─────────────────────────────────────────────────────── */
+.cfg-grid {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr 1fr;
+  gap: 12px; align-items: end;
+}
+@media (max-width: 580px) { .cfg-grid { grid-template-columns: 1fr 1fr; } }
+
+.logo-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.logo-box {
+  width: 76px; height: 62px; border: 2px dashed var(--border);
+  border-radius: var(--r); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; background: #f6f8fc; transition: border-color .15s;
+}
+.logo-box:hover { border-color: var(--blue); }
+.logo-box img   { max-width: 100%; max-height: 100%; object-fit: contain; }
+.logo-ph        { text-align: center; font-size: 10px; color: var(--text2); line-height: 1.4; }
+.logo-hint      { font-size: 10px; color: var(--blue); cursor: pointer; }
+.logo-hint:hover { text-decoration: underline; }
+
+.cfg-fld label  { display: block; font-size: 11px; font-weight: 600; color: var(--text2); margin-bottom: 4px; }
+.cfg-fld input  {
+  width: 100%; border: 1px solid var(--border); border-radius: 5px;
+  padding: 7px 9px; font-size: 12px; color: var(--text); background: #fff; outline: none;
+}
+.cfg-fld input:focus { border-color: var(--blue); }
+
+/* ── Upload area ─────────────────────────────────────────────────────── */
+.upload-area {
+  border: 2px dashed var(--border); border-radius: var(--r);
+  padding: 2.2rem 1.5rem; text-align: center; cursor: pointer;
+  background: #f6f8fc; transition: background .15s, border-color .15s;
+}
+.upload-area:hover, .upload-area.drag-over { background: #eaf1ff; border-color: var(--blue); }
+.upload-area.loaded                         { border-color: var(--green); background: #f0faf4; }
+.upload-icon  { font-size: 30px; margin-bottom: .5rem; }
+.upload-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.upload-sub   { font-size: 12px; color: var(--text2); }
+.upload-area.loaded .upload-sub { color: var(--green); }
+
+/* ── Status ──────────────────────────────────────────────────────────── */
+.status-bar {
+  font-size: 13px; padding: 9px 14px; background: #eaf1ff;
+  border: 1px solid #bed0ef; border-radius: var(--r);
+  color: var(--navy); display: none; margin-bottom: 1rem;
+}
+
+/* ── Controls ────────────────────────────────────────────────────────── */
+.controls {
+  display: none; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.controls select {
+  flex: 1; min-width: 200px; border: 1px solid var(--border); border-radius: var(--r);
+  padding: 9px 10px; font-size: 13px; color: var(--text); background: #fff; outline: none;
+}
+.controls select:focus { border-color: var(--blue); }
+
+.btn {
+  border: none; border-radius: var(--r); padding: 9px 18px;
+  font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-view { background: var(--navy); color: #fff; }
+.btn-view:hover:not(:disabled) { background: var(--navy-dk); }
+.btn-pdf  { background: #c0392b; color: #fff; display: none; }
+.btn-pdf:hover:not(:disabled)  { background: #9b2d23; }
+.btn-all  { background: #5c3487; color: #fff; }
+.btn-all:hover:not(:disabled)  { background: #3f2460; }
+
+/* ── Preview wrapper ─────────────────────────────────────────────────── */
+#boletim-preview { display: none; margin-top: 1.25rem; overflow-x: auto; }
+.preview-outer {
+  display: inline-block; border: 1px solid var(--border);
+  border-radius: var(--r); overflow: hidden;
+  box-shadow: 0 4px 24px rgba(20,34,58,.13);
+}
+
+/* ── Progress overlay ────────────────────────────────────────────────── */
+.progress-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.48); z-index: 9999;
+  align-items: center; justify-content: center;
+}
+.progress-overlay.active { display: flex; }
+.progress-box {
+  background: #fff; border-radius: 12px; padding: 2rem 2.5rem;
+  text-align: center; min-width: 270px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.2);
+}
+.progress-title { font-size: 15px; font-weight: 700; color: var(--navy); }
+.progress-label { font-size: 13px; color: var(--text2); margin-top: 6px; }
+.pb-wrap { width: 100%; height: 7px; background: #e0e8f0; border-radius: 4px; margin-top: 16px; overflow: hidden; }
+.pb-fill { height: 100%; background: var(--blue); border-radius: 4px; transition: width .3s; width: 0%; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Cabeçalho -->
+  <div class="ph">
+    <div class="ph-icon">📋</div>
+    <div>
+      <h1>Gerador de Boletins</h1>
+      <p>Colégio Caminhos e Colinas — solução provisória enquanto a Setti não coopera</p>
+    </div>
+  </div>
+
+  <!-- Configurações -->
+  <div class="card">
+    <div class="card-title">Configurações</div>
+    <div class="cfg-grid">
+
+      <div class="logo-wrap">
+        <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px;">Logo</div>
+        <div class="logo-box" id="logo-box" onclick="document.getElementById('logo-input').click()" title="Clique para trocar o logo">
+          <div class="logo-ph" id="logo-ph">🏫<br>Sem logo</div>
+        </div>
+        <span class="logo-hint" onclick="document.getElementById('logo-input').click()">Trocar imagem</span>
+        <input type="file" id="logo-input" accept="image/*" style="display:none">
+      </div>
+
+      <div class="cfg-fld">
+        <label for="cfg-trim">Período</label>
+        <input id="cfg-trim" type="text" value="1º Trimestre 2026" maxlength="30">
+      </div>
+      <div class="cfg-fld">
+        <label for="cfg-turno">Turno</label>
+        <input id="cfg-turno" type="text" value="Matutino" maxlength="20">
+      </div>
+      <div class="cfg-fld">
+        <label for="cfg-ano">Ano Letivo</label>
+        <input id="cfg-ano" type="text" value="2026" maxlength="4">
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Upload -->
+  <div class="card">
+    <div class="card-title">Dados das Notas</div>
+    <div class="upload-area" id="upload-area" onclick="document.getElementById('csv-input').click()">
+      <div class="upload-icon">📊</div>
+      <div class="upload-title">Média_Final.csv</div>
+      <div class="upload-sub" id="upload-sub">Clique aqui ou arraste o arquivo exportado pelo sistema</div>
+      <input type="file" id="csv-input" accept=".csv" style="display:none">
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-bar" id="status-bar"></div>
+
+  <!-- Controles -->
+  <div class="card" id="controls-card" style="display:none">
+    <div class="controls" id="controls">
+      <select id="aluno-select">
+        <option value="">Selecione um aluno…</option>
+      </select>
+      <button class="btn btn-view" onclick="gerarBoletim()">👁 Visualizar</button>
+      <button class="btn btn-pdf" id="btn-pdf" onclick="exportarPDF()">📄 Exportar PDF</button>
+      <button class="btn btn-all" id="btn-all" onclick="exportarTodosPDF()">📁 Exportar Todos</button>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div id="boletim-preview">
+    <div class="preview-outer">
+      <div id="bol-content"></div>
+    </div>
+  </div>
+
+</div><!-- /.app -->
+
+<!-- Progress overlay -->
+<div class="progress-overlay" id="progress-overlay">
+  <div class="progress-box">
+    <div class="progress-title" id="progress-title">Gerando PDF…</div>
+    <div class="progress-label" id="progress-label">Aguarde</div>
+    <div class="pb-wrap"><div class="pb-fill" id="pb-fill"></div></div>
+  </div>
+</div>
+
+<!-- Estilos injetados no boletim (usados em preview e PDF) -->
+<style id="bol-style"></style>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+// CSS do Boletim — definido como string para ser injetado também no PDF
+// ═══════════════════════════════════════════════════════════════════════════════
+const BOL_CSS = `
+.bol {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11px;
+  color: #000;
+  background: #fff;
+  width: 794px;
+  border: 1px solid #888;
+}
+
+/* ─── Cabeçalho da escola ───────────────────────────────────────────────── */
+.bol-hdr {
+  display: flex;
+  border-bottom: 2px solid #000;
+  min-height: 72px;
+}
+.bol-hdr-logo {
+  width: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border-right: 1px solid #aaa;
+  flex-shrink: 0;
+}
+.bol-hdr-logo img {
+  max-width: 82px;
+  max-height: 58px;
+  object-fit: contain;
+}
+.bol-hdr-logo-ph {
+  font-size: 11px;
+  color: #aaa;
+  text-align: center;
+  line-height: 1.5;
+}
+.bol-hdr-info {
+  padding: 9px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+.bol-hdr-nome   { font-size: 13px; font-weight: bold; }
+.bol-hdr-detalhe { font-size: 10px; color: #333; line-height: 1.6; }
+
+/* ─── Título ────────────────────────────────────────────────────────────── */
+.bol-titulo {
+  text-align: center;
+  font-size: 15px;
+  font-weight: bold;
+  padding: 7px 0;
+  border-bottom: 2px solid #000;
+  background: #f2f2f2;
+  letter-spacing: .02em;
+}
+
+/* ─── Dados do aluno ────────────────────────────────────────────────────── */
+.bol-aluno {
+  padding: 5px 10px 6px;
+  border-bottom: 1px solid #888;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bol-aluno-linha {
+  display: flex;
+  gap: 0;
+  align-items: baseline;
+  flex-wrap: nowrap;
+}
+.al-lbl {
+  font-weight: bold;
+  font-size: 10px;
+  white-space: nowrap;
+  margin-right: 5px;
+}
+.al-val {
+  font-size: 11px;
+  border-bottom: 1px solid #666;
+  padding-bottom: 1px;
+  margin-right: 18px;
+  min-width: 60px;
+}
+.al-val-nome { min-width: 240px; }
+.al-val-mat  { min-width: 55px; }
+.al-val-ord  { min-width: 40px; }
+.al-val-tm   { min-width: 90px; }
+.al-val-trn  { min-width: 90px; }
+.al-val-ano  { min-width: 50px; }
+.al-val-per  { min-width: 120px; margin-right: 0; }
+
+/* ─── Tabela de notas ───────────────────────────────────────────────────── */
+.bol-tbl {
+  width: 100%;
+  border-collapse: collapse;
+}
+.bol-tbl thead tr th {
+  border: 1px solid #777;
+  padding: 5px 7px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: bold;
+  background: #e2e2e2;
+  line-height: 1.35;
+}
+.bol-tbl thead tr th.th-disc {
+  text-align: left;
+  width: 75%;
+}
+.bol-tbl tbody tr td {
+  border: 1px solid #ccc;
+  padding: 4px 7px;
+  font-size: 11px;
+  vertical-align: middle;
+}
+.bol-tbl tbody tr:nth-child(odd)  td { background: #fff; }
+.bol-tbl tbody tr:nth-child(even) td { background: #f7f7f7; }
+.bol-tbl tbody tr td.td-disc { text-align: left; }
+.bol-tbl tbody tr td.td-nota { text-align: center; font-weight: bold; font-size: 12px; }
+
+/* ─── Cores das notas ───────────────────────────────────────────────────── */
+.n-ok   { color: #1a6e35; }
+.n-warn { color: #a05800; }
+.n-bad  { color: #a02020; }
+.n-em   { color: #999; }
+
+/* ─── Rodapé ────────────────────────────────────────────────────────────── */
+.bol-rodape {
+  border-top: 2px solid #000;
+  padding: 5px 10px;
+  background: #f2f2f2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.bol-rodape-resultado { font-size: 10px; }
+.bol-rodape-media     { font-size: 11px; font-weight: bold; }
+`;
+
+// Injetar estilos no preview
+document.getElementById('bol-style').textContent = BOL_CSS;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Estado global
+// ═══════════════════════════════════════════════════════════════════════════════
+let dataFinal    = null;
+let currentAluno = null;
+let currentIdx   = -1;
+let logoDataURL  = null;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Parser CSV — RFC 4180 correto
+// Trata campos entre aspas (ex: "7,56") sem partir na vírgula interna
+// ═══════════════════════════════════════════════════════════════════════════════
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let i = 0;
+  const n = text.length;
+
+  while (i < n) {
+    let campo = '';
+
+    if (text[i] === '"') {
+      // ── Campo entre aspas ──────────────────────────────────────
+      i++; // pula aspas de abertura
+      while (i < n) {
+        if (text[i] === '"') {
+          if (i + 1 < n && text[i + 1] === '"') {
+            campo += '"'; i += 2; // aspas escapadas ("")
+          } else {
+            i++; break;           // aspas de fechamento
+          }
+        } else {
+          campo += text[i++];
+        }
+      }
+    } else {
+      // ── Campo sem aspas ────────────────────────────────────────
+      while (i < n && text[i] !== ',' && text[i] !== '\r' && text[i] !== '\n') {
+        campo += text[i++];
+      }
+    }
+
+    row.push(campo.trim());
+
+    if (i >= n) { if (row.length) rows.push(row); break; }
+
+    if (text[i] === ',') {
+      i++; // próximo campo na mesma linha
+    } else {
+      // Fim da linha
+      if (text[i] === '\r') i++;
+      if (i < n && text[i] === '\n') i++;
+      rows.push(row);
+      row = [];
+    }
+  }
+
+  return rows;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Parser do arquivo Média_Final.csv
+// Estrutura:
+//   Linha 0: [turma, "Média Geral X,XX", disc1, disc2, ...]
+//   Linha 1: ["Média Final", "", avgTurma1, avgTurma2, ...]
+//   Linha 2: ["Aluno", "", "Nota", "Nota", ...]
+//   Linha 3+: [nomeAluno, mediaGeralAluno, nota1, nota2, ...]
+// ═══════════════════════════════════════════════════════════════════════════════
+function parseMediaFinal(texto) {
+  const rows = parseCSV(texto);
+  if (rows.length < 4) throw new Error('CSV muito curto ou formato inesperado.');
+
+  const r0 = rows[0]; // cabeçalho principal
+  const r1 = rows[1]; // médias da turma por disciplina
+
+  const turmaNome = (r0[0] || '').trim();
+
+  // Extrai "7,27" de "Média Geral 7,27"
+  const mGMatch = (r0[1] || '').match(/(\d+[,\.]\d+)/);
+  const turmaAvg = mGMatch ? parseFloat(mGMatch[1].replace(',', '.')) : null;
+
+  // Disciplinas (col ≥ 2, ignora vazias e "Unnamed")
+  const disciplinas = [];
+  for (let c = 2; c < r0.length; c++) {
+    const nome = (r0[c] || '').trim();
+    if (nome && !nome.startsWith('Unnamed')) {
+      disciplinas.push({ nome, col: c, mediaClasseStr: (r1[c] || '').trim() });
+    }
+  }
+
+  // Alunos (a partir da linha 3)
+  const alunos = [];
+  for (let i = 3; i < rows.length; i++) {
+    const r = rows[i];
+    const nome = (r[0] || '').trim();
+    if (!nome || nome === 'Aluno' || nome === 'Média Final') continue;
+
+    const aluno = {
+      nome,
+      mediaGeralStr: (r[1] || '').trim(),
+      notas: {}
+    };
+    disciplinas.forEach(d => { aluno.notas[d.nome] = (r[d.col] || '').trim(); });
+    alunos.push(aluno);
+  }
+
+  return { turmaNome, turmaAvg, disciplinas, alunos };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Helpers de nota
+// ═══════════════════════════════════════════════════════════════════════════════
+function strParaNum(s) {
+  if (!s || s.trim() === '') return null;
+  const n = parseFloat(s.replace(',', '.'));
+  return isNaN(n) ? null : n;
+}
+
+function formatarNota(s) {
+  const n = strParaNum(s);
+  return n === null ? '' : n.toFixed(2).replace('.', ',');
+}
+
+function classeCor(s) {
+  const n = strParaNum(s);
+  if (n === null) return 'n-em';
+  if (n >= 7)  return 'n-ok';
+  if (n >= 5)  return 'n-warn';
+  return 'n-bad';
+}
+
+function resultado(s) {
+  const n = strParaNum(s);
+  if (n === null) return 'Aluno Cursando';
+  if (n >= 7)    return 'Aprovado';
+  if (n >= 5)    return 'Em Recuperação';
+  return 'Reprovado';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Gera HTML do boletim
+// ═══════════════════════════════════════════════════════════════════════════════
+function buildBoletimHTML(aluno, idx) {
+  const periodo = (document.getElementById('cfg-trim').value  || '1º Trimestre').trim();
+  const turno   = (document.getElementById('cfg-turno').value || 'Matutino').trim();
+  const ano     = (document.getElementById('cfg-ano').value   || '2026').trim();
+
+  // Logo
+  const logoHTML = logoDataURL
+    ? `<img src="${logoDataURL}" alt="Logo da escola">`
+    : `<div class="bol-hdr-logo-ph">🏫<br>Logo</div>`;
+
+  // Linhas da tabela
+  const linhas = dataFinal.disciplinas.map(d => {
+    const nota    = aluno.notas[d.nome] || '';
+    const notaFmt = formatarNota(nota);
+    const cls     = notaFmt ? classeCor(nota) : 'n-em';
+    return `<tr>
+      <td class="td-disc">${d.nome}</td>
+      <td class="td-nota ${cls}">${notaFmt}</td>
+    </tr>`;
+  }).join('');
+
+  const res      = resultado(aluno.mediaGeralStr);
+  const mediaFmt = formatarNota(aluno.mediaGeralStr);
+
+  return `<div class="bol">
+
+    <!-- Cabeçalho da escola -->
+    <div class="bol-hdr">
+      <div class="bol-hdr-logo">${logoHTML}</div>
+      <div class="bol-hdr-info">
+        <div class="bol-hdr-nome">COLÉGIO CAMINHOS E COLINAS</div>
+        <div class="bol-hdr-detalhe">
+          CNPJ: 23.819.759/0001-04<br>
+          Endereço: Rua Manuel Rodrigues Mexelhão, 70<br>
+          Bairro: Jardim Selma
+        </div>
+      </div>
+    </div>
+
+    <!-- Título -->
+    <div class="bol-titulo">Boletim Escolar - Trimestral</div>
+
+    <!-- Dados do aluno -->
+    <div class="bol-aluno">
+      <div class="bol-aluno-linha">
+        <span class="al-lbl">NOME</span>
+        <span class="al-val al-val-nome">${aluno.nome}</span>
+        <span class="al-lbl">MATRIC</span>
+        <span class="al-val al-val-mat"></span>
+        <span class="al-lbl">Nº ORDEM</span>
+        <span class="al-val al-val-ord">${idx + 1}</span>
+      </div>
+      <div class="bol-aluno-linha">
+        <span class="al-lbl">TURMA</span>
+        <span class="al-val al-val-tm">${dataFinal.turmaNome}</span>
+        <span class="al-lbl">TURNO</span>
+        <span class="al-val al-val-trn">${turno}</span>
+        <span class="al-lbl">ANO LETIVO</span>
+        <span class="al-val al-val-ano">${ano}</span>
+        <span class="al-lbl">PERÍODO</span>
+        <span class="al-val al-val-per">${periodo}</span>
+      </div>
+    </div>
+
+    <!-- Tabela de notas -->
+    <table class="bol-tbl">
+      <thead>
+        <tr>
+          <th class="th-disc">DISCIPLINAS</th>
+          <th>MÉDIA FINAL<br>${periodo.toUpperCase()}</th>
+        </tr>
+      </thead>
+      <tbody>${linhas}</tbody>
+    </table>
+
+    <!-- Rodapé -->
+    <div class="bol-rodape">
+      <div class="bol-rodape-resultado">
+        <strong>RESULTADO FINAL:</strong> ${res}
+        &nbsp;&nbsp;&nbsp;
+        <strong>FALTAS ACUMULADAS:</strong> 0
+        &nbsp;&nbsp;&nbsp;
+        <strong>% FREQ.:</strong> 100
+      </div>
+      <div class="bol-rodape-media ${classeCor(aluno.mediaGeralStr)}">
+        MÉDIA GERAL: ${mediaFmt || '—'}
+      </div>
+    </div>
+
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Ações da UI
+// ═══════════════════════════════════════════════════════════════════════════════
+function gerarBoletim() {
+  const sel = document.getElementById('aluno-select');
+  const idx = parseInt(sel.value);
+  if (isNaN(idx)) return;
+
+  currentAluno = dataFinal.alunos[idx];
+  currentIdx   = idx;
+
+  document.getElementById('bol-content').innerHTML = buildBoletimHTML(currentAluno, idx);
+
+  const preview = document.getElementById('boletim-preview');
+  preview.style.display = 'block';
+  document.getElementById('btn-pdf').style.display = 'inline-block';
+  preview.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Barra de progresso ────────────────────────────────────────────────────────
+function setProgress(pct, label, titulo) {
+  document.getElementById('pb-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = label;
+  if (titulo) document.getElementById('progress-title').textContent = titulo;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Renderização para PDF (html2canvas → jsPDF)
+// ═══════════════════════════════════════════════════════════════════════════════
+async function renderizarParaPDF(aluno, idx) {
+  // Div temporário fora da tela com todos os estilos inline
+  const tmpDiv = document.createElement('div');
+  tmpDiv.style.cssText = 'position:absolute;left:-9999px;top:0;background:#fff;';
+  tmpDiv.innerHTML = `<style>${BOL_CSS}</style>${buildBoletimHTML(aluno, idx)}`;
+  document.body.appendChild(tmpDiv);
+
+  // Aguarda renderização
+  await new Promise(r => setTimeout(r, 80));
+
+  try {
+    const canvas = await html2canvas(tmpDiv.querySelector('.bol'), {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      width: 794
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pw = 210, ph = 297, m = 8;
+    const iw = pw - m * 2;
+    const ih = (canvas.height * iw) / canvas.width;
+
+    if (ih <= ph - m * 2) {
+      // Cabe numa página
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', m, m, iw, ih);
+    } else {
+      // Múltiplas páginas (caso o boletim seja muito alto)
+      let yo = 0, pag = 0;
+      const sh = ph - m * 2;
+      while (yo < ih) {
+        if (pag > 0) pdf.addPage();
+        const sy    = (yo / ih) * canvas.height;
+        const schH  = Math.min((sh / ih) * canvas.height, canvas.height - sy);
+        const sc    = document.createElement('canvas');
+        sc.width    = canvas.width;
+        sc.height   = Math.ceil(schH);
+        sc.getContext('2d').drawImage(canvas, 0, sy, canvas.width, schH, 0, 0, canvas.width, schH);
+        pdf.addImage(sc.toDataURL('image/png'), 'PNG', m, m, iw, (schH * iw) / canvas.width);
+        yo += sh; pag++;
+      }
+    }
+    return pdf;
+  } finally {
+    document.body.removeChild(tmpDiv);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Exportar PDF — aluno único
+// ═══════════════════════════════════════════════════════════════════════════════
+async function exportarPDF() {
+  if (!currentAluno) return;
+  const btn = document.getElementById('btn-pdf');
+  btn.disabled = true;
+  const overlay = document.getElementById('progress-overlay');
+  overlay.classList.add('active');
+  setProgress(5, 'Preparando boletim…', 'Gerando PDF…');
+
+  try {
+    setProgress(40, 'Renderizando layout…');
+    const pdf = await renderizarParaPDF(currentAluno, currentIdx);
+    setProgress(90, 'Salvando arquivo…');
+
+    const slug = currentAluno.nome
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, '_');
+    pdf.save(`boletim_${dataFinal.turmaNome}_${slug}.pdf`);
+
+    setProgress(100, 'Pronto! ✓');
+    await new Promise(r => setTimeout(r, 700));
+  } catch (e) {
+    console.error(e);
+    alert('Erro ao gerar PDF: ' + e.message);
+  } finally {
+    overlay.classList.remove('active');
+    btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Exportar PDF — todos os alunos (PDF único com uma página por aluno)
+// ═══════════════════════════════════════════════════════════════════════════════
+async function exportarTodosPDF() {
+  if (!dataFinal) return;
+  const btn = document.getElementById('btn-all');
+  btn.disabled = true;
+  const overlay = document.getElementById('progress-overlay');
+  overlay.classList.add('active');
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const combinado = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const total = dataFinal.alunos.length;
+    let primeiraPage = true;
+
+    for (let i = 0; i < total; i++) {
+      const aluno = dataFinal.alunos[i];
+      setProgress(
+        Math.round(((i) / total) * 90) + 5,
+        `${i + 1}/${total}: ${aluno.nome}`,
+        'Gerando todos os boletins…'
+      );
+
+      const tmpDiv = document.createElement('div');
+      tmpDiv.style.cssText = 'position:absolute;left:-9999px;top:0;background:#fff;';
+      tmpDiv.innerHTML = `<style>${BOL_CSS}</style>${buildBoletimHTML(aluno, i)}`;
+      document.body.appendChild(tmpDiv);
+      await new Promise(r => setTimeout(r, 50));
+
+      try {
+        const canvas = await html2canvas(tmpDiv.querySelector('.bol'), {
+          scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, width: 794
+        });
+
+        if (!primeiraPage) combinado.addPage();
+        primeiraPage = false;
+
+        const pw = 210, ph = 297, m = 8;
+        const iw = pw - m * 2;
+        const ih = (canvas.height * iw) / canvas.width;
+
+        if (ih <= ph - m * 2) {
+          combinado.addImage(canvas.toDataURL('image/png'), 'PNG', m, m, iw, ih);
+        } else {
+          let yo = 0, pag = 0;
+          const sh = ph - m * 2;
+          while (yo < ih) {
+            if (pag > 0) combinado.addPage();
+            const sy   = (yo / ih) * canvas.height;
+            const schH = Math.min((sh / ih) * canvas.height, canvas.height - sy);
+            const sc   = document.createElement('canvas');
+            sc.width   = canvas.width; sc.height = Math.ceil(schH);
+            sc.getContext('2d').drawImage(canvas, 0, sy, canvas.width, schH, 0, 0, canvas.width, schH);
+            combinado.addImage(sc.toDataURL('image/png'), 'PNG', m, m, iw, (schH * iw) / canvas.width);
+            yo += sh; pag++;
+          }
+        }
+      } finally {
+        document.body.removeChild(tmpDiv);
+      }
+    }
+
+    setProgress(98, 'Salvando arquivo…');
+    combinado.save(`boletins_${dataFinal.turmaNome}_todos.pdf`);
+    setProgress(100, 'Pronto! ✓');
+    await new Promise(r => setTimeout(r, 700));
+  } catch (e) {
+    console.error(e);
+    alert('Erro ao gerar PDFs: ' + e.message);
+  } finally {
+    overlay.classList.remove('active');
+    btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Upload do CSV
+// ═══════════════════════════════════════════════════════════════════════════════
+function processarCSV(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      dataFinal = parseMediaFinal(ev.target.result);
+
+      // UI de upload
+      const area = document.getElementById('upload-area');
+      area.classList.add('loaded');
+      document.getElementById('upload-sub').textContent =
+        `✓ ${file.name} — ${dataFinal.alunos.length} alunos carregados`;
+
+      // Popula o select
+      const sel = document.getElementById('aluno-select');
+      sel.innerHTML = '<option value="">Selecione um aluno…</option>';
+      dataFinal.alunos.forEach((a, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = `${String(i + 1).padStart(2, '0')}. ${a.nome}`;
+        sel.appendChild(opt);
+      });
+
+      // Mostra controles
+      document.getElementById('controls-card').style.display = 'block';
+      document.getElementById('controls').style.display      = 'flex';
+      document.getElementById('btn-pdf').style.display       = 'none';
+      document.getElementById('boletim-preview').style.display = 'none';
+
+      // Barra de status
+      const sb = document.getElementById('status-bar');
+      sb.style.display = 'block';
+      sb.innerHTML = `✅ <strong>${dataFinal.alunos.length}</strong> alunos — turma <strong>${dataFinal.turmaNome}</strong>` +
+        (dataFinal.turmaAvg !== null
+          ? ` — média geral da turma: <strong>${dataFinal.turmaAvg.toFixed(2).replace('.', ',')}</strong>`
+          : '');
+
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao ler o CSV:\n' + err.message + '\n\nVerifique se é o arquivo Média_Final correto.');
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+// Eventos de upload do CSV
+const csvInput   = document.getElementById('csv-input');
+const uploadArea = document.getElementById('upload-area');
+csvInput.addEventListener('change', e => processarCSV(e.target.files[0]));
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', ()   => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadArea.classList.remove('drag-over');
+  processarCSV(e.dataTransfer.files[0]);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Upload do logo
+// ═══════════════════════════════════════════════════════════════════════════════
+document.getElementById('logo-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    logoDataURL = ev.target.result;
+    const box = document.getElementById('logo-box');
+    box.innerHTML = `<img src="${logoDataURL}" style="max-width:72px;max-height:58px;object-fit:contain" alt="Logo">`;
+    // Atualiza preview se estiver aberto
+    if (currentAluno !== null) {
+      document.getElementById('bol-content').innerHTML = buildBoletimHTML(currentAluno, currentIdx);
+    }
+  };
+  reader.readAsDataURL(file);
+});
+</script>
+
+</body>
+</html>
