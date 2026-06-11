@@ -668,7 +668,7 @@ async function renderizarParaPDF(aluno, idx) {
 
   try {
     const canvas = await html2canvas(tmpDiv.querySelector('.bol'), {
-      scale: 2,
+      scale: 1.5,
       useCORS: true,
       backgroundColor: '#ffffff',
       logging: false,
@@ -683,7 +683,7 @@ async function renderizarParaPDF(aluno, idx) {
 
     if (ih <= ph - m * 2) {
       // Cabe numa página
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', m, m, iw, ih);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', m, m, iw, ih);
     } else {
       // Múltiplas páginas (caso o boletim seja muito alto)
       let yo = 0, pag = 0;
@@ -696,7 +696,7 @@ async function renderizarParaPDF(aluno, idx) {
         sc.width    = canvas.width;
         sc.height   = Math.ceil(schH);
         sc.getContext('2d').drawImage(canvas, 0, sy, canvas.width, schH, 0, 0, canvas.width, schH);
-        pdf.addImage(sc.toDataURL('image/png'), 'PNG', m, m, iw, (schH * iw) / canvas.width);
+        pdf.addImage(sc.toDataURL('image/jpeg', 0.85), 'JPEG', m, m, iw, (schH * iw) / canvas.width);
         yo += sh; pag++;
       }
     }
@@ -771,7 +771,7 @@ async function exportarTodosPDF() {
 
       try {
         const canvas = await html2canvas(tmpDiv.querySelector('.bol'), {
-          scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, width: 794
+          scale: 1.5, useCORS: true, backgroundColor: '#ffffff', logging: false, width: 794
         });
 
         if (!primeiraPage) combinado.addPage();
@@ -782,7 +782,7 @@ async function exportarTodosPDF() {
         const ih = (canvas.height * iw) / canvas.width;
 
         if (ih <= ph - m * 2) {
-          combinado.addImage(canvas.toDataURL('image/png'), 'PNG', m, m, iw, ih);
+          combinado.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', m, m, iw, ih);
         } else {
           let yo = 0, pag = 0;
           const sh = ph - m * 2;
@@ -793,7 +793,7 @@ async function exportarTodosPDF() {
             const sc   = document.createElement('canvas');
             sc.width   = canvas.width; sc.height = Math.ceil(schH);
             sc.getContext('2d').drawImage(canvas, 0, sy, canvas.width, schH, 0, 0, canvas.width, schH);
-            combinado.addImage(sc.toDataURL('image/png'), 'PNG', m, m, iw, (schH * iw) / canvas.width);
+            combinado.addImage(sc.toDataURL('image/jpeg', 0.85), 'JPEG', m, m, iw, (schH * iw) / canvas.width);
             yo += sh; pag++;
           }
         }
